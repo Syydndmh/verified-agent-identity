@@ -4,38 +4,56 @@ on:
   workflow_dispatch:
     inputs:
       agent_name:
-        description: 'xavient'
+        description: 'Nama agent (contoh: xavien)'
         required: true
-        default: 'xavient'
+        default: 'xavien'
       agent_description:
-        description: 'xavient'
+        description: 'Deskripsi agent'
         required: true
-        default: 'xavient AI Agent'
+        default: 'xavien AI Agent'
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - name: Checkout your repo (jika ada custom files)
+        uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
-      - name: Step 1 - Install ClawHub skill
-        run: npx clawhub@latest install verified-agent-identity
-
-      - name: Install script dependencies
+      - name: Clone verified-agent-identity skill langsung dari GitHub
         run: |
-          cd scripts
-          npm install
+          mkdir -p skills
+          cd skills
+          git clone https://github.com/BillionsNetwork/verified-agent-identity.git verified-agent-identity
+          cd verified-agent-identity
+          # Install dependencies kalau ada package.json (saat ini minimal, tapi aman)
+          npm install @0xpolygonid/js-sdk @iden3/js-iden3-core @iden3/js-iden3-auth ethers shell-quote uuid || echo "No package.json or install skipped"
+          cd ../..
+
+      - name: Debug - Cek struktur folder skill
+        run: ls -la skills/verified-agent-identity/scripts || echo "Scripts folder tidak ditemukan!"
 
       - name: Step 2 - Create new Ethereum Identity
-        run: node scripts/createNewEthereumIdentity.js
+        run: node skills/verified-agent-identity/scripts/createNewEthereumIdentity.js
+        env:
+          # Optional: kalau mau pakai private key existing, tambah input workflow nanti
+          # ETH_PRIVATE_KEY: ${{ secrets.ETH_PRIVATE_KEY }}
 
       - name: Step 3 - Link Human to Agent
         run: |
-          node scripts/manualLinkHumanToAgent.js --challenge '{"name": "xavient", "description": "xavient AI Agent"}'
+          node skills/verified-agent-identity/scripts/manualLinkHumanToAgent.js \
+            --challenge '{"name": "${{ inputs.agent_name }}", "description": "${{ inputs.agent_description }}"}'
+
+      - name: Show output / debug kalau gagal
+        if: always()
+        run: |
+          echo "Cek log di atas untuk hasil create identity dan link URL"
+          cat skills/verified-agent-identity/*.json 2>/dev/null || true
