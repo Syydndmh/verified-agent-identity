@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       agent_name:
-        description: 'xavien'
+        description: 'Nama agent kamu'
         required: true
         default: 'xavien'
       agent_description:
-        description: 'xavien'
+        description: 'Deskripsi agent'
         required: true
         default: 'xavien AI Agent'
 
@@ -18,27 +18,44 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4   # upgrade ke v4 biar lebih fresh
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Install ClawHub CLI globally
-        run: npm install -g clawhub@0.7.0    # atau @latest kalau sudah fix
+        run: npm install -g clawhub@latest
 
-      - name: Step 1 - Install ClawHub skill
-        run: clawhub install verified-agent-identity
+      - name: Verify ClawHub installed
+        run: clawhub --version || echo "ClawHub gagal install, cek log"
 
-      - name: Install script dependencies
+      - name: Step 1 - Install verified-agent-identity skill
+        run: clawhub install verified-agent-identity --force   # --force biar overwrite kalau sudah ada
+
+      - name: Install script dependencies (jika ada package.json di skill)
         run: |
-          cd scripts
-          npm install
+          if [ -d "skills/verified-agent-identity" ]; then
+            cd skills/verified-agent-identity
+            if [ -f "package.json" ]; then
+              npm install
+            fi
+            cd ../..
+          else
+            echo "Folder skill tidak ditemukan!"
+            exit 1
+          fi
 
       - name: Step 2 - Create new Ethereum Identity
-        run: node scripts/createNewEthereumIdentity.js
+        run: node skills/verified-agent-identity/scripts/createNewEthereumIdentity.js
 
       - name: Step 3 - Link Human to Agent
         run: |
-          node scripts/manualLinkHumanToAgent.js --challenge '{"name": "xavien", "description": "xavien AI Agent"}'
+          node skills/verified-agent-identity/scripts/manualLinkHumanToAgent.js \
+            --challenge '{"name": "${{ inputs.agent_name }}", "description": "${{ inputs.agent_description }}"}'
+
+      - name: Debug - Show directory structure (kalau error)
+        if: always()
+        run: ls -la skills/verified-agent-identity || echo "Skill folder tidak ada"
