@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       agent_name:
-        description: 'Nama agent kamu'
+        description: 'Xavient'
         required: true
-        default: 'xavien'
+        default: 'xavient'
       agent_description:
-        description: 'Deskripsi agent'
+        description: 'xavient agent'
         required: true
         default: 'xavien AI Agent'
 
